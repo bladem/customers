@@ -2,6 +2,7 @@ package org.pausanchez.services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.quarkus.hibernate.reactive.panache.Panache;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.json.JsonArray;
 import io.vertx.ext.web.client.WebClientOptions;
@@ -15,8 +16,11 @@ import org.pausanchez.repositories.CustomersRepository;
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
+import javax.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.List;
+
+import static javax.ws.rs.core.Response.Status.*;
 
 
 @ApplicationScoped
@@ -38,30 +42,43 @@ public class CustomerServiceImpl implements CustomerService{
     }
 
     @Override
-    public void addCustomer(Customer customer) {
+    public Uni<Response> addCustomer(Customer customer) {
         customer.getProducts().forEach(p-> p.setCustomer(customer));
-        customerRepository.save(customer);
+
+        return Panache.withTransaction(()-> customerRepository.persist(customer))
+                .replaceWith(Response.ok(customer).status(CREATED)::build);
     }
 
     @Override
-    public void updateCustomer(Customer customer) {
-        customerRepository.save(customer);
+    public Uni<Response> updateCustomer(Customer customer) {
+        return Panache
+                .withTransaction(() -> customerRepository.findById(customer.getId())
+                        .onItem().ifNotNull().invoke(entity -> {
+                            entity.setNames(customer.getNames());
+                            entity.setAccountNumber(customer.getAccountNumber());
+                            entity.setCode(customer.getCode());
+                        })
+                )
+                .onItem().ifNotNull().transform(entity -> Response.ok(entity).build())
+                .onItem().ifNull().continueWith(Response.ok().status(NOT_FOUND)::build);
     }
 
     @Override
-    public void deleteCustomer(Long id) {
-        Customer customer = customerRepository.findById(id).orElseThrow();
-        customerRepository.delete(customer);
+    public Uni<Response> deleteCustomer(Long id) {
+        return Panache.withTransaction(() -> customerRepository.deleteById(id))
+                .map(deleted -> deleted
+                        ? Response.ok().status(NO_CONTENT).build()
+                        : Response.ok().status(NOT_FOUND).build());
     }
 
     @Override
-    public List<Customer> getCustomers() {
-        return customerRepository.findAll();
+    public Uni<List<Customer>> getCustomers() {
+        return customerRepository.findAll().list();
     }
 
     @Override
-    public Customer getCustomerById(Long id) {
-        return customerRepository.findById(id).orElseThrow();
+    public Uni<Customer> getCustomerById(Long id) {
+        return customerRepository.findById(id);
     }
 
     @Override
@@ -81,9 +98,7 @@ public class CustomerServiceImpl implements CustomerService{
 
     private Uni<Customer> getCustomerReactive(Long id){
         log.info("Obteniendo customers");
-        Customer customer = customerRepository.findById(id).orElseThrow();
-
-        return Uni.createFrom().item(customer);
+        return customerRepository.findById(id);
     }
 
     private Uni<List<Product>> getAllProducts(){

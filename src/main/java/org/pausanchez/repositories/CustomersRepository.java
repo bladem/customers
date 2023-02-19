@@ -1,10 +1,10 @@
 package org.pausanchez.repositories;
 
+import io.quarkus.hibernate.reactive.panache.PanacheRepositoryBase;
 import org.pausanchez.entities.Customer;
-import org.springframework.data.jpa.repository.JpaRepository;
 
 import javax.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
-public interface CustomersRepository extends JpaRepository<Customer, Long> {
+public class CustomersRepository implements PanacheRepositoryBase<Customer, Long> {
 }

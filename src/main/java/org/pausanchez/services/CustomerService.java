@@ -3,13 +3,14 @@ package org.pausanchez.services;
 import io.smallrye.mutiny.Uni;
 import org.pausanchez.entities.Customer;
 
+import javax.ws.rs.core.Response;
 import java.util.List;
 
 public interface CustomerService {
-    void addCustomer(Customer customer);
-    void updateCustomer(Customer customer);
-    void deleteCustomer(Long id);
-    List<Customer> getCustomers();
-    Customer getCustomerById(Long id);
+    Uni<Response> addCustomer(Customer customer);
+    Uni<Response> updateCustomer(Customer customer);
+    Uni<Response> deleteCustomer(Long id);
+    Uni<List<Customer>> getCustomers();
+    Uni<Customer> getCustomerById(Long id);
     Uni<Customer> getCustomerWithProducts(Long id);
 }
