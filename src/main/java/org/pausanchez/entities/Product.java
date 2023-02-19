@@ -24,9 +24,12 @@ public class Product {
     @Column
     private Long product;
 
+    @Transient
     private String name;
 
+    @Transient
     private String code;
 
+    @Transient
     private String description;
 }

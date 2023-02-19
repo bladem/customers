@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.pausanchez.entities.Customer;
 import org.pausanchez.entities.Product;
 import org.pausanchez.repositories.CustomersRepository;
+import org.pausanchez.services.CustomerService;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
@@ -28,97 +29,46 @@ import java.util.List;
 public class CustomersApi {
 
     @Inject
-    private CustomersRepository customerRepository;
-
-    @Inject
-    private Vertx vertx;
-
-    private WebClient webClient;
-    @PostConstruct
-    void init(){
-        webClient = WebClient.create(vertx,
-                new WebClientOptions().setDefaultHost("localhost")
-                        .setDefaultPort(8080).setSsl(false).setTrustAll(true));
-    }
+    private CustomerService customerService;
 
     @POST
     @Blocking
     public Response addCustomer(Customer customer) {
-        customer.getProducts().forEach(p-> p.setCustomer(customer));
-        customerRepository.save(customer);
+        customerService.addCustomer(customer);
         return Response.ok().build();
     }
 
     @PUT
     @Blocking
     public Response updateCustomer(Customer customer){
-        customerRepository.save(customer);
+        customerService.updateCustomer(customer);
         return Response.ok().build();
     }
     @Path("/{id}")
     @DELETE
     @Blocking
     public Response deleteCustomer(@PathParam("id") Long id){
-        Customer customer = customerRepository.findById(id).orElseThrow();
-        customerRepository.delete(customer);
+        customerService.deleteCustomer(id);
         return Response.ok().build();
     }
 
     @GET
     @Blocking
     public List<Customer> getCustomers(){
-        return customerRepository.findAll();
+        return customerService.getCustomers();
     }
 
     @Path("/{id}")
     @GET
     @Blocking
     public Customer getCustomerById(@PathParam("id") Long id){
-        return customerRepository.findById(id).orElseThrow();
+        return customerService.getCustomerById(id);
     }
 
     @Path("/{id}/product")
     @GET
     @Blocking
     public Uni<Customer> getProductById(@PathParam("id") Long id){
-       return Uni.combine().all().unis(getCustomerReactive(id), getAllProducts())
-                .combinedWith((cust,prods)-> {
-                    cust.getProducts().forEach(product -> prods.forEach(p-> {
-                        if(p.getId().equals(product.getProduct())){
-                            product.setName(p.getName());
-                            product.setDescription(p.getDescription());
-                        }
-                    }));
-                    return cust;
-                });
-    }
-
-    private Uni<Customer> getCustomerReactive(Long id){
-        Customer customer = customerRepository.findById(id).orElseThrow();
-
-        return Uni.createFrom().item(customer);
-    }
-
-    private Uni<List<Product>> getAllProducts(){
-        return webClient.get(8080, "localhost", "/product").send()
-                .onFailure().invoke(res -> log.error("Error recuperando productos", res))
-                .onItem().transform(res -> {
-                    log.info("Parseando productos obtenidos");
-                    List<Product> productList = new ArrayList<>();
-                    JsonArray objects = res.bodyAsJsonArray();
-
-                    objects.forEach(p -> {
-                        log.info("Productos {}", p);
-                        ObjectMapper objectMapper = new ObjectMapper();
-                        Product product;
-                        try {
-                            product = objectMapper.readValue(p.toString(), Product.class);
-                            productList.add(product);
-                        } catch (JsonProcessingException e) {
-                            log.error("Error parseando product", e);
-                        }
-                    });
-                    return productList;
-                });
+       return customerService.getCustomerWithProducts(id);
     }
 }
